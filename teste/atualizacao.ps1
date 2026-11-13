@@ -16,6 +16,14 @@ function Registro {
     Where-Object { $_.DisplayName -like "*Caixa da loja*" -or $_.DisplayName -like "*Zaqui*" } | Select-Object -First 1
 }
 function Programa { Get-Process -Name "Caixa da loja por Zaqui" -ErrorAction SilentlyContinue }
+function Diagnostico {
+  Write-Host "---- diagnostico"
+  Write-Host "   registro: $((Registro).DisplayVersion)"
+  Get-ChildItem (Join-Path $env:LOCALAPPDATA "zaqui-caixa-updater") -Recurse -ErrorAction SilentlyContinue | ForEach-Object { Write-Host "   cache: $($_.FullName) $($_.Length)" }
+  Programa | ForEach-Object { Write-Host "   processo $($_.Id) desde $($_.StartTime)" }
+  foreach ($f in @("programa-saida.txt", "programa-erro.txt", "programa-saida2.txt", "programa-erro2.txt")) { if (Test-Path $f) { Write-Host "   ---- $f"; Get-Content $f -Tail 60 | ForEach-Object { Write-Host "   | $_" } } }
+}
+function Falhar($msg) { Diagnostico; throw $msg }
 function Esperar($o, $limite, [scriptblock]$cond) {
   $t = [Diagnostics.Stopwatch]::StartNew()
   while ($t.Elapsed.TotalSeconds -lt $limite) { if (& $cond) { Write-Host "   $o em $([int]$t.Elapsed.TotalSeconds) s"; return $true }; Start-Sleep -Seconds 2 }
@@ -55,28 +63,28 @@ if ($Caso -in @("toque120", "x121")) { Remove-Item $atalho -ErrorAction Silently
 $env:ZAQUI_CAIXA_URL = "http://localhost:8080"
 if ($Caso -in @("madrugada121", "segura121")) { $env:ZAQUI_CAIXA_MADRUGADA_TESTE = "1"; $env:ZAQUI_CAIXA_MADRUGADA_INTERVALO_MS = "15000" }
 Write-Host "== $Caso : $de instalada; abrindo o programa"
-Start-Process $exe
-if (-not (Esperar "programa aberto" 60 { Programa })) { throw "o programa $de nao abriu" }
-if (-not (Esperar "versao $para baixada" 240 { Test-Path (Join-Path $pendente "Zaqui-Caixa-instalar-$para.exe") })) { throw "a $para nao baixou" }
+Start-Process $exe -RedirectStandardOutput programa-saida.txt -RedirectStandardError programa-erro.txt
+if (-not (Esperar "programa aberto" 60 { Programa })) { Falhar "o programa $de nao abriu" }
+if (-not (Esperar "versao $para baixada" 240 { Test-Path (Join-Path $pendente "Zaqui-Caixa-instalar-$para.exe") })) { Falhar "a $para nao baixou" }
 Start-Sleep 5
 
 switch ($Caso) {
   { $_ -in @("x120", "x121") } { Write-Host "== fechando no X"; (Programa | Where-Object { $_.MainWindowHandle -ne 0 } | Select-Object -First 1).CloseMainWindow() | Out-Null }
   "abertura121" {
     Write-Host "== programa morto sem fechar (como o computador desligado) e aberto de novo"
-    Programa | Stop-Process -Force; Start-Sleep 3; Start-Process $exe
+    Programa | Stop-Process -Force; Start-Sleep 3; Start-Process $exe -RedirectStandardOutput programa-saida2.txt -RedirectStandardError programa-erro2.txt
   }
 }
 
 $instalou = Esperar "registro na $para" 300 { (Registro).DisplayVersion -eq $para }
 if ($Caso -eq "segura121") {
-  if ($instalou) { throw "SEGURA: instalou com pedido novo esperando" }
+  if ($instalou) { Falhar "SEGURA: instalou com pedido novo esperando" }
   Write-Host "RESULTADO segura121: com pedido novo esperando, a madrugada NAO instalou em 5 min (versao $((Registro).DisplayVersion))."
   exit 0
 }
 if (-not $instalou) {
   if ($Caso -eq "x120") { Write-Host "RESULTADO x120 (diagnostico da 1.2.0): fechar no X NAO instalou a $para em 5 min, como o Pedro viu."; exit 0 }
-  throw "RESULTADO ${Caso}: a $para NAO instalou"
+  Falhar "RESULTADO ${Caso}: a $para NAO instalou"
 }
 # O instalador fecha qualquer programa aberto antes de copiar: programa aberto DEPOIS que ele termina foi reaberto.
 $reabriu = Esperar "instalador terminou e o programa reabriu" 120 { -not (Get-Process -Name "Zaqui-Caixa-instalar*" -ErrorAction SilentlyContinue) -and (Programa) }
@@ -84,6 +92,7 @@ $sh = (New-Object -ComObject WScript.Shell).CreateShortcut($atalho)
 Write-Host "   atalho: existe=$(Test-Path $atalho) alvo=$($sh.TargetPath) alvo_existe=$(Test-Path $sh.TargetPath)"
 $atalhoOk = (Test-Path $atalho) -and ($sh.TargetPath -eq $exe) -and (Test-Path $exe)
 if ($Caso -eq "x120") { Write-Host "RESULTADO x120 (diagnostico da 1.2.0): fechar no X instalou a $para; reabriu=$reabriu; atalho=$atalhoOk"; exit 0 }
-if (-not $reabriu) { throw "RESULTADO ${Caso}: instalou a $para mas o programa NAO reabriu" }
-if (-not $atalhoOk) { throw "RESULTADO ${Caso}: instalou e reabriu, mas o atalho da area de trabalho nao esta certo" }
+if (-not $reabriu) { Falhar "RESULTADO ${Caso}: instalou a $para mas o programa NAO reabriu" }
+if (-not $atalhoOk) { Falhar "RESULTADO ${Caso}: instalou e reabriu, mas o atalho da area de trabalho nao esta certo" }
 Write-Host "RESULTADO ${Caso}: a $para instalou sozinha, o programa reabriu e o atalho aponta para o exe."
+Diagnostico
