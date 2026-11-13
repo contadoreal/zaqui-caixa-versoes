@@ -21,6 +21,8 @@ function Diagnostico {
   Write-Host "   registro: $((Registro).DisplayVersion)"
   Get-ChildItem (Join-Path $env:LOCALAPPDATA "zaqui-caixa-updater") -Recurse -ErrorAction SilentlyContinue | ForEach-Object { Write-Host "   cache: $($_.FullName) $($_.Length)" }
   Programa | ForEach-Object { Write-Host "   processo $($_.Id) desde $($_.StartTime)" }
+  $reg = Join-Path $env:APPDATA "Zaqui Caixa\registro.log"
+  if (Test-Path $reg) { Write-Host "   ---- registro.log do programa"; Get-Content $reg -Tail 80 | ForEach-Object { Write-Host "   | $_" } }
   foreach ($f in @("programa-saida.txt", "programa-erro.txt", "programa-saida2.txt", "programa-erro2.txt")) { if (Test-Path $f) { Write-Host "   ---- $f"; Get-Content $f -Tail 60 | ForEach-Object { Write-Host "   | $_" } } }
 }
 function Falhar($msg) { Diagnostico; throw $msg }
