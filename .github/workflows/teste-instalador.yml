@@ -2,6 +2,7 @@ name: teste do instalador
 on:
   push:
     branches: [teste-instalador]
+    paths: [teste/teste.ps1, .github/workflows/teste-instalador.yml]
 permissions:
   # write: o token do próprio repositório só enxerga a versão em rascunho (não publicada) com escrita.
   contents: write

@@ -1,0 +1,33 @@
+name: teste da atualizacao
+on:
+  push:
+    branches: [teste-instalador]
+    paths: [teste/atualizacao.ps1, .github/workflows/teste-atualizacao.yml]
+permissions:
+  # write: o token do próprio repositório só enxerga a versão em rascunho (não publicada) com escrita.
+  contents: write
+jobs:
+  atualizar:
+    runs-on: windows-latest
+    timeout-minutes: 30
+    strategy:
+      fail-fast: false
+      matrix:
+        caso: [toque120, x120, x121, madrugada121, segura121, abertura121]
+    steps:
+      - uses: actions/checkout@v4
+      - name: baixar os instaladores (rascunho teste-atualizacao)
+        shell: pwsh
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          $rel = gh api repos/contadoreal/zaqui-caixa-versoes/releases --jq '.[] | select(.draft and .tag_name == "teste-atualizacao") | .id'
+          if (-not $rel) { throw "rascunho teste-atualizacao nao achado" }
+          $assets = gh api repos/contadoreal/zaqui-caixa-versoes/releases/$rel/assets | ConvertFrom-Json
+          foreach ($a in $assets) {
+            curl.exe -sSL -H "Authorization: Bearer $env:GH_TOKEN" -H "Accept: application/octet-stream" -o $a.name "https://api.github.com/repos/contadoreal/zaqui-caixa-versoes/releases/assets/$($a.id)"
+          }
+          Get-ChildItem | Format-Table Name, Length
+      - name: caso ${{ matrix.caso }}
+        shell: pwsh
+        run: ./teste/atualizacao.ps1 -Caso ${{ matrix.caso }}
