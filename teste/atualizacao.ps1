@@ -82,6 +82,11 @@ switch ($Caso) {
 $instalou = Esperar "registro na $para" 300 { (Registro).DisplayVersion -eq $para }
 if ($Caso -eq "segura121") {
   if ($instalou) { Falhar "SEGURA: instalou com pedido novo esperando" }
+  $reg = Join-Path $env:APPDATA "Zaqui Caixa\registro.log"
+  $esperas = @(Select-String -Path $reg -Pattern "madrugada: espera \(novos=1\)").Count
+  Write-Host "   o programa conferiu a madrugada $esperas vezes e esperou em todas (novos=1)"
+  Select-String -Path $reg -Pattern "madrugada" | Select-Object -Last 3 | ForEach-Object { Write-Host "   | $($_.Line)" }
+  if ($esperas -lt 5) { Falhar "SEGURA: a madrugada nao foi conferida (o teste nao prova nada)" }
   Write-Host "RESULTADO segura121: com pedido novo esperando, a madrugada NAO instalou em 5 min (versao $((Registro).DisplayVersion))."
   exit 0
 }
