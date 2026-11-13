@@ -1,0 +1,33 @@
+name: teste do instalador
+on:
+  push:
+    branches: [teste-instalador]
+permissions:
+  # write: o token do próprio repositório só enxerga a versão em rascunho (não publicada) com escrita.
+  contents: write
+jobs:
+  instalar:
+    runs-on: windows-latest
+    timeout-minutes: 25
+    strategy:
+      fail-fast: false
+      matrix:
+        caso: [controle, normal, corrompido, atualizacao]
+    steps:
+      - uses: actions/checkout@v4
+      - name: baixar os instaladores (versao de teste, rascunho)
+        shell: pwsh
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          # O rascunho não tem tag até ser publicado: acha pela API (rascunho com a tag pedida) e baixa cada arquivo.
+          $rel = gh api repos/contadoreal/zaqui-caixa-versoes/releases --jq '.[] | select(.draft and .tag_name == "teste-instalador") | .id'
+          if (-not $rel) { throw "rascunho teste-instalador nao achado" }
+          $assets = gh api repos/contadoreal/zaqui-caixa-versoes/releases/$rel/assets | ConvertFrom-Json
+          foreach ($a in $assets) {
+            curl.exe -sSL -H "Authorization: Bearer $env:GH_TOKEN" -H "Accept: application/octet-stream" -o $a.name "https://api.github.com/repos/contadoreal/zaqui-caixa-versoes/releases/assets/$($a.id)"
+          }
+          Get-ChildItem *.exe | ForEach-Object { "{0} {1}" -f $_.Name, (Get-FileHash $_ -Algorithm SHA256).Hash }
+      - name: caso ${{ matrix.caso }}
+        shell: pwsh
+        run: ./teste/teste.ps1 -Caso ${{ matrix.caso }}
