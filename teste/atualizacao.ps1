@@ -1,3 +1,4 @@
+# (rodada com a 1.2.1 que leva o atualizar.js no pacote)
 # TESTE DA ATUALIZAÇÃO SOZINHA DO CAIXA NUM WINDOWS LIMPO (versão 1.2.1, pedido do Pedro, 13/11/2026).
 # Um servidor local faz de "GitHub" (latest.yml e o instalador) e de "portal" (uma página que fala com o
 # programa como a do caixa: conta a atividade e, no caso "toque", toca em Reiniciar agora).
